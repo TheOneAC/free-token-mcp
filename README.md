@@ -27,25 +27,29 @@ Each model scored 0-100 across three dimensions:
 
 ## Usage
 
-### With Claude Code
+### One-Click Install
 
-Add to your `claude.json`:
+```bash
+pip install mcp && curl -sL https://raw.githubusercontent.com/TheOneAC/free-token-mcp/main/server.py -o free-token-mcp-server.py
+```
+
+Then run:
+
+```bash
+python3 free-token-mcp-server.py
+```
+
+### With Claude Code
 
 ```json
 {
   "mcpServers": {
     "free-token-mcp": {
       "command": "python3",
-      "args": ["/path/to/server.py"]
+      "args": ["/path/to/free-token-mcp-server.py"]
     }
   }
 }
-```
-
-### Standalone
-
-```bash
-python3 server.py
 ```
 
 ## Requirements
