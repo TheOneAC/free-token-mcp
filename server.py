@@ -9,14 +9,10 @@ Usage:
 """
 
 import json
-import os
 import re
-import subprocess
-import tempfile
 import urllib.request
 import urllib.error
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -240,90 +236,6 @@ def get_best_coding_model() -> str:
 def get_best_agent_model() -> str:
     """Return the free model with the highest agent and tool-calling capability score."""
     return get_top_free_models(criterion="agent", top_n=1)
-
-
-@mcp.tool()
-def launch_claude_code(model_id: str = "auto") -> str:
-    """Pick the best free coding model and launch a new Claude Code session.
-
-    Automatically detects OpenRouter API key from environment or Hermes auth pool,
-    writes a temporary claude.json, and opens a new terminal with Claude Code.
-
-    Args:
-        model_id: Model ID to use (default "auto" = pick best free coding model)
-    """
-    try:
-        # 1. Resolve model
-        if model_id == "auto":
-            raw = fetch_models()
-            free = filter_free_models(raw)
-            scored = []
-            for m in free:
-                if m.id == "openrouter/free":
-                    continue
-                scored.append((compute_coding_score(m), m.id, m.name))
-            scored.sort(key=lambda x: x[0], reverse=True)
-            if not scored:
-                return json.dumps({"error": "No free models found."})
-            model_id = scored[0][1]
-            model_name = scored[0][2]
-        else:
-            model_name = model_id
-
-        # 2. Get API key
-        api_key = os.environ.get("OPENROUTER_API_KEY", "")
-        if not api_key:
-            try:
-                result = subprocess.run(
-                    ["hermes", "auth", "list", "--json"],
-                    capture_output=True, text=True, timeout=10,
-                )
-                if result.returncode == 0:
-                    creds = json.loads(result.stdout)
-                    for c in creds if isinstance(creds, list) else [creds]:
-                        if "openrouter" in str(c).lower():
-                            api_key = c.get("api_key", c.get("key", ""))
-                            break
-            except Exception:
-                pass
-
-        if not api_key:
-            return json.dumps({
-                "error": "No OpenRouter API key found. "
-                         "Set OPENROUTER_API_KEY env var or add via: hermes auth add openrouter <key>"
-            })
-
-        # 3. Write temp claude.json
-        tmp_dir = Path(tempfile.mkdtemp(prefix="free-token-mcp-"))
-        config = {
-            "model": model_id,
-            "baseUrl": "https://openrouter.ai/api/v1",
-            "mcpServers": {},
-        }
-        config_path = tmp_dir / "claude.json"
-        config_path.write_text(json.dumps(config, indent=2))
-
-        # 4. Launch Claude Code in new terminal
-        script = (
-            f'cd {tmp_dir} && '
-            f'ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1 '
-            f'ANTHROPIC_API_KEY={api_key} '
-            f'claude --model {model_id}'
-        )
-        subprocess.Popen(
-            ["osascript", "-e",
-             f'tell app "Terminal" to do script "{script}"'],
-        )
-
-        return json.dumps({
-            "model": model_id,
-            "name": model_name,
-            "config_dir": str(tmp_dir),
-            "status": "Launched Claude Code in new Terminal window.",
-        }, indent=2, ensure_ascii=False)
-
-    except Exception as e:
-        return json.dumps({"error": str(e)})
 
 
 @mcp.tool()
