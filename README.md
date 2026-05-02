@@ -41,6 +41,8 @@ python3 free-token-mcp-server.py
 
 ### With Claude Code
 
+Add to `claude.json`:
+
 ```json
 {
   "mcpServers": {
@@ -50,6 +52,18 @@ python3 free-token-mcp-server.py
     }
   }
 }
+```
+
+### With Hermes
+
+Add to `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  free-token-mcp:
+    command: python3
+    args: ["/path/to/free-token-mcp-server.py"]
+    enabled: true
 ```
 
 ## Requirements
