@@ -1,6 +1,8 @@
-# Free Token MCP
+# OpenRouter Free MCP
 
 An MCP (Model Context Protocol) server that discovers and evaluates free AI models on OpenRouter.
+
+[GitHub](https://github.com/TheOneAC/openrouter-free-mcp)
 
 ## Features
 
@@ -31,13 +33,13 @@ Each model scored 0-100 across three dimensions:
 ### One-Click Install
 
 ```bash
-pip install mcp && curl -sL https://raw.githubusercontent.com/TheOneAC/free-token-mcp/main/server.py -o free-token-mcp-server.py
+pip install mcp && curl -sL https://raw.githubusercontent.com/TheOneAC/openrouter-free-mcp/main/server.py -o openrouter-free-mcp-server.py
 ```
 
 Then run:
 
 ```bash
-python3 free-token-mcp-server.py
+python3 openrouter-free-mcp-server.py
 ```
 
 ### With Claude Code
@@ -49,7 +51,7 @@ Add to `claude.json`:
   "mcpServers": {
     "free-token-mcp": {
       "command": "python3",
-      "args": ["/path/to/free-token-mcp-server.py"]
+      "args": ["/path/to/openrouter-free-mcp-server.py"]
     }
   }
 }
@@ -63,7 +65,7 @@ Add to `~/.hermes/config.yaml`:
 mcp_servers:
   free-token-mcp:
     command: python3
-    args: ["/path/to/free-token-mcp-server.py"]
+    args: ["/path/to/openrouter-free-mcp-server.py"]
     enabled: true
 ```
 

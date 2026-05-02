@@ -4,6 +4,8 @@ Fetches model list from OpenRouter API (no API key needed for listing),
 filters for free models (prompt=0, completion=0), evaluates Agent and Coding
 capability based on supported_parameters, context_length, and model size.
 
+GitHub: https://github.com/TheOneAC/openrouter-free-mcp
+
 Usage:
     python server.py
 """
