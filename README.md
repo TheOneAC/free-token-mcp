@@ -16,6 +16,7 @@ An MCP (Model Context Protocol) server that discovers and evaluates free AI mode
 | `get_top_free_models` | Top N models by agent/coding/size/balanced score |
 | `get_best_coding_model` | Best model for coding tasks |
 | `get_best_agent_model` | Best model for agent/tool-calling |
+| `generate_team_config` | Recommend the best free model for each agent team role (coordinator, coder, researcher, vision) |
 | `launch_claude_code` | Pick the best free model and launch a new Claude Code session |
 
 ## Scoring

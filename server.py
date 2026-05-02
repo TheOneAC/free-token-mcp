@@ -327,6 +327,84 @@ def launch_claude_code(model_id: str = "auto") -> str:
 
 
 @mcp.tool()
+def generate_team_config() -> str:
+    """Generate an agent team config with the best free model for each role.
+
+    Returns recommended models for Coordinator, Coder, Researcher, and Vision roles,
+    each optimized for their specific capability.
+    """
+    try:
+        raw = fetch_models()
+        free = filter_free_models(raw)
+
+        scored_models = []
+        for m in free:
+            if m.id == "openrouter/free":
+                continue
+            scored_models.append({
+                "id": m.id,
+                "name": m.name,
+                "context": m.context_length,
+                "size": format_size(parse_model_size(m.description)),
+                "supports_vision": m.supports_vision,
+                "scores": {
+                    "agent": compute_agent_score(m),
+                    "coding": compute_coding_score(m),
+                    "balanced": round((compute_agent_score(m) + compute_coding_score(m) + compute_size_score(m.description)) / 3, 1),
+                },
+                "strengths": _strengths(m, parse_model_size(m.description)),
+            })
+
+        def best(key):
+            return max(scored_models, key=lambda m: m["scores"][key])
+
+        # Find best vision model
+        vision_models = [m for m in scored_models if m["supports_vision"]]
+        best_vision = max(vision_models, key=lambda m: m["context"]) if vision_models else scored_models[0]
+
+        top = best("agent")
+        team = {
+            "coordinator": {
+                "model": top["id"],
+                "name": top["name"],
+                "reason": "Highest agent/tool-calling score — orchestrates sub-agents",
+                "scores": top["scores"],
+            },
+            "coder": {
+                "model": best("coding")["id"],
+                "name": best("coding")["name"],
+                "reason": "Highest coding score — handles implementation tasks",
+                "scores": best("coding")["scores"],
+            },
+            "researcher": {
+                "model": best("balanced")["id"],
+                "name": best("balanced")["name"],
+                "reason": "Best all-rounder for research and analysis",
+                "scores": best("balanced")["scores"],
+            },
+            "vision": {
+                "model": best_vision["id"],
+                "name": best_vision["name"],
+                "reason": "Best free vision-capable model for image tasks",
+                "scores": best_vision["scores"],
+                "context_length": best_vision["context"],
+            },
+        }
+
+        # If coordinator already supports vision, note it
+        if top["supports_vision"]:
+            team["coordinator"]["note"] = "This model also supports vision — no separate vision agent needed."
+
+        return json.dumps({
+            "team": team,
+            "note": "Configure delegation.model per role in Hermes, or use delegate_task with specific models.",
+        }, indent=2, ensure_ascii=False)
+
+    except RuntimeError as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
 def get_top_free_models(criterion: str = "balanced", top_n: int = 3) -> str:
     """Evaluate free models and return top N by agent/coding/size capability.
 
