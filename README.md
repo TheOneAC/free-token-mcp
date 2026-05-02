@@ -7,6 +7,7 @@ An MCP (Model Context Protocol) server that discovers and evaluates free AI mode
 ## Features
 
 - **List all free models** — fetches real-time data from OpenRouter API
+- **Model access test** — automatically tests each free model via a minimal chat request before recommending; inaccessible models are skipped
 - **Top model recommendations** — scores models on Agent, Coding, and Size criteria
 - **Vision companion** — automatically recommends a free vision-capable model when your chosen model doesn't support vision
 
@@ -73,6 +74,12 @@ mcp_servers:
 
 - Python 3.10+
 - `mcp` package (`pip install mcp`)
+
+### Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `OPENROUTER_API_KEY` | No | API key for model access testing. When set, each free model is tested with a minimal chat request before being recommended. Models that fail the test are automatically skipped. If not set, all free models are shown without testing. |
 
 ## License
 

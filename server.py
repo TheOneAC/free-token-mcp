@@ -11,15 +11,79 @@ Usage:
 """
 
 import json
+import os
 import re
 import urllib.request
 import urllib.error
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
+OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Process-level cache for model access test results: model_id -> accessible
+_ACCESS_CACHE: dict[str, bool] = {}
+_ACCESS_TEST_TIMEOUT = 15       # seconds per model
+_ACCESS_TEST_MAX_WORKERS = 10
+
+
+# ── Model access test ──────────────────────────────────────────────────────────
+
+def _test_single_model(model_id: str) -> tuple[str, bool]:
+    """Send a minimal chat request to verify a model is actually reachable."""
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        return model_id, True
+
+    body = json.dumps({
+        "model": model_id,
+        "messages": [{"role": "user", "content": "hi"}],
+        "max_tokens": 1,
+    }).encode()
+
+    req = urllib.request.Request(
+        OPENROUTER_CHAT_URL,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": "free-token-mcp/0.1",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_ACCESS_TEST_TIMEOUT) as resp:
+            return model_id, resp.status == 200
+    except Exception:
+        return model_id, False
+
+
+def filter_accessible(models: list[ModelInfo]) -> list[ModelInfo]:
+    """Test each model in parallel and return only those that respond successfully.
+
+    Results are cached in-process to avoid re-testing on every tool call.
+    If OPENROUTER_API_KEY is not set, all models pass through (no testing).
+    """
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
+        return models
+
+    # Only test uncached models; skip the openrouter/free routing model
+    to_test = [m.id for m in models if m.id not in _ACCESS_CACHE and m.id != "openrouter/free"]
+
+    if to_test:
+        with ThreadPoolExecutor(max_workers=_ACCESS_TEST_MAX_WORKERS) as pool:
+            fut_map = {pool.submit(_test_single_model, mid): mid for mid in to_test}
+            for fut in as_completed(fut_map):
+                try:
+                    model_id, ok = fut.result()
+                    _ACCESS_CACHE[model_id] = ok
+                except Exception:
+                    pass
+
+    return [m for m in models if m.id == "openrouter/free" or _ACCESS_CACHE.get(m.id, False)]
 
 
 # ── Data structures ──────────────────────────────────────────────────────────
@@ -207,9 +271,13 @@ def list_free_models() -> str:
     try:
         raw = fetch_models()
         free = filter_free_models(raw)
+        total_free = len(free)
+        free = filter_accessible(free)
+        skipped = total_free - len(free)
         free.sort(key=lambda m: m.context_length, reverse=True)
         output = {
             "count": len(free),
+            "skipped_inaccessible": skipped,
             "models": [
                 {
                     "id": m.id,
@@ -250,6 +318,7 @@ def generate_team_config() -> str:
     try:
         raw = fetch_models()
         free = filter_free_models(raw)
+        free = filter_accessible(free)
 
         scored_models = []
         for m in free:
@@ -336,6 +405,7 @@ def get_top_free_models(criterion: str = "balanced", top_n: int = 3) -> str:
     try:
         raw = fetch_models()
         free = filter_free_models(raw)
+        free = filter_accessible(free)
 
         scored: list[tuple[float, ModelInfo, float, float, float]] = []
         for m in free:
